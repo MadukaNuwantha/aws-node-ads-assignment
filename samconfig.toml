@@ -1,0 +1,14 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "ads-assignment"
+resolve_s3 = true
+s3_prefix = "ads-assignment"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+disable_rollback = true
+parameter_overrides = "DynamoTableName=\"AdsTable\" S3BucketName=\"ads-api-assignment-s3-bucket\" SnsTopicArn=\"arn:aws:sns:ap-southeast-1:542784560968:ads-api-ad-created\" CognitoUserPoolId=\"ap-southeast-1_EE5VEeHgK\" CognitoAppClientId=\"6du49t555mi37vrd9i63nbecn6\""
+image_repositories = []
+
+[default.global.parameters]
+region = "ap-southeast-1"

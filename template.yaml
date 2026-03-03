@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Ads API - Lambda + API Gateway (existing resources referenced via parameters)
+
+Parameters:
+  DynamoTableName:
+    Type: String
+    Default: AdsTable
+    Description: Existing DynamoDB table name
+
+  S3BucketName:
+    Type: String
+    Default: ads-api-assignment-s3-bucket
+    Description: Existing S3 bucket name for ad images
+
+  SnsTopicArn:
+    Type: String
+    Description: Existing SNS topic ARN for ad-created notifications
+
+  CognitoUserPoolId:
+    Type: String
+    Default: ap-southeast-1_EE5VEeHgK
+    Description: Existing Cognito User Pool ID
+
+  CognitoAppClientId:
+    Type: String
+    Default: 6du49t555mi37vrd9i63nbecn6
+    Description: Existing Cognito App Client ID
+
+  CognitoAppClientSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Cognito App Client secret (leave empty if App Client has no secret)
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref DynamoTableName
+        BUCKET_NAME: !Ref S3BucketName
+        SNS_TOPIC_ARN: !Ref SnsTopicArn
+        REGION: !Ref AWS::Region
+        COGNITO_APP_CLIENT_ID: !Ref CognitoAppClientId
+        COGNITO_CLIENT_SECRET: !Ref CognitoAppClientSecret
+
+Resources:
+  AdsApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Description: Ads REST API
+      Auth:
+        Authorizers:
+          CognitoAuthorizer:
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPoolId}
+              audience:
+                - !Ref CognitoAppClientId
+        DefaultAuthorizer: CognitoAuthorizer
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+        AllowMethods:
+          - POST
+          - OPTIONS
+
+  CreateAdFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: es2020
+        EntryPoints:
+          - src/handlers/createAd.ts
+        External:
+          - '@aws-sdk/*'
+    Properties:
+      FunctionName: ads-api-create-ad
+      CodeUri: ./
+      Handler: src/handlers/createAd.handler
+      Description: Creates a new ad listing
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref DynamoTableName
+        - S3WritePolicy:
+            BucketName: !Ref S3BucketName
+        - SNSPublishMessagePolicy:
+            TopicName: !Select [5, !Split [':', !Ref SnsTopicArn]]
+      Events:
+        CreateAd:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AdsApi
+            Path: /ads
+            Method: POST
+
+  SignupFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: es2020
+        EntryPoints:
+          - src/handlers/signup.ts
+        External:
+          - '@aws-sdk/*'
+    Properties:
+      FunctionName: ads-api-signup
+      CodeUri: ./
+      Handler: src/handlers/signup.handler
+      Description: Registers a new user
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: cognito-idp:SignUp
+              Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}
+      Events:
+        Signup:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AdsApi
+            Path: /auth/signup
+            Method: POST
+            Auth:
+              Authorizer: NONE
+
+  LoginFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: es2020
+        EntryPoints:
+          - src/handlers/login.ts
+        External:
+          - '@aws-sdk/*'
+    Properties:
+      FunctionName: ads-api-login
+      CodeUri: ./
+      Handler: src/handlers/login.handler
+      Description: Authenticates a user and returns tokens
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: cognito-idp:InitiateAuth
+              Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}
+      Events:
+        Login:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AdsApi
+            Path: /auth/login
+            Method: POST
+            Auth:
+              Authorizer: NONE
+
+Outputs:
+  AdsApiUrl:
+    Description: API Gateway base URL
+    Value: !Sub https://${AdsApi}.execute-api.${AWS::Region}.amazonaws.com
+    Export:
+      Name: AdsApiUrl
+
+  CreateAdFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt CreateAdFunction.Arn
+    Export:
+      Name: CreateAdFunctionArn
