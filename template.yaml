@@ -69,6 +69,7 @@ Resources:
           - Authorization
         AllowMethods:
           - POST
+          - GET
           - OPTIONS
 
   CreateAdFunction:
@@ -101,6 +102,33 @@ Resources:
             ApiId: !Ref AdsApi
             Path: /ads
             Method: POST
+
+  GetAllAdsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: es2020
+        EntryPoints:
+          - src/handlers/getAllAds.ts
+        External:
+          - '@aws-sdk/*'
+    Properties:
+      FunctionName: ads-api-get-all-ads
+      CodeUri: ./
+      Handler: src/handlers/getAllAds.handler
+      Description: Retrieves all ad listings
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref DynamoTableName
+      Events:
+        GetAllAds:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AdsApi
+            Path: /ads
+            Method: GET
 
   SignupFunction:
     Type: AWS::Serverless::Function

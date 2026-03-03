@@ -1,4 +1,4 @@
-import { saveAd } from '../services/dynamoService';
+import { saveAd, getAllAds } from '../services/dynamoService';
 import { Ad } from '../types';
 
 jest.mock('@aws-sdk/client-dynamodb', () => {
@@ -16,6 +16,7 @@ jest.mock('@aws-sdk/lib-dynamodb', () => {
       from: jest.fn().mockReturnValue({ send: mockSend }),
     },
     PutCommand: jest.fn().mockImplementation((input) => ({ input })),
+    ScanCommand: jest.fn().mockImplementation((input) => ({ input })),
     _mockSend: mockSend,
   };
 });
@@ -65,5 +66,41 @@ describe('dynamoService', () => {
     mockDocSend.mockRejectedValueOnce(new Error('DynamoDB error'));
 
     await expect(saveAd(sampleAd)).rejects.toThrow('DynamoDB error');
+  });
+
+  describe('getAllAds', () => {
+    it('should return all ads from DynamoDB', async () => {
+      const items = [
+        { adId: 'id-1', title: 'Ad 1', price: 10, createdAt: '2026-01-01T00:00:00.000Z' },
+        { adId: 'id-2', title: 'Ad 2', price: 20, createdAt: '2026-01-02T00:00:00.000Z' },
+      ];
+      mockDocSend.mockResolvedValueOnce({ Items: items });
+
+      const result = await getAllAds();
+
+      expect(result).toEqual(items);
+      expect(mockDocSend).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return empty array when Items is undefined', async () => {
+      mockDocSend.mockResolvedValueOnce({});
+
+      const result = await getAllAds();
+
+      expect(result).toEqual([]);
+    });
+
+    it('should throw when TABLE_NAME is not set', async () => {
+      delete process.env.TABLE_NAME;
+
+      await expect(getAllAds()).rejects.toThrow('TABLE_NAME environment variable is not set');
+      expect(mockDocSend).not.toHaveBeenCalled();
+    });
+
+    it('should propagate DynamoDB scan errors', async () => {
+      mockDocSend.mockRejectedValueOnce(new Error('Scan failed'));
+
+      await expect(getAllAds()).rejects.toThrow('Scan failed');
+    });
   });
 });
