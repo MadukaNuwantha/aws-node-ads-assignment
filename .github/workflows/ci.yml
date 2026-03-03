@@ -32,3 +32,67 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  deploy:
+    name: Deploy to AWS
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Validate secrets
+        run: |
+          missing=()
+          [[ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]]         && missing+=("AWS_ACCESS_KEY_ID")
+          [[ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]]     && missing+=("AWS_SECRET_ACCESS_KEY")
+          [[ -z "${{ secrets.SNS_TOPIC_ARN }}" ]]             && missing+=("SNS_TOPIC_ARN")
+          [[ -z "${{ secrets.COGNITO_CLIENT_SECRET }}" ]]     && missing+=("COGNITO_CLIENT_SECRET")
+          [[ -z "${{ vars.DYNAMO_TABLE_NAME }}" ]]            && missing+=("DYNAMO_TABLE_NAME (variable)")
+          [[ -z "${{ vars.S3_BUCKET_NAME }}" ]]               && missing+=("S3_BUCKET_NAME (variable)")
+          [[ -z "${{ vars.COGNITO_USER_POOL_ID }}" ]]         && missing+=("COGNITO_USER_POOL_ID (variable)")
+          [[ -z "${{ vars.COGNITO_APP_CLIENT_ID }}" ]]        && missing+=("COGNITO_APP_CLIENT_ID (variable)")
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "ERROR: The following required secrets/variables are not set:"
+            for s in "${missing[@]}"; do echo "  - $s"; done
+            exit 1
+          fi
+          echo "All required secrets and variables are present."
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-1
+
+      - name: Setup SAM CLI
+        uses: aws-actions/setup-sam@v2
+
+      - name: SAM build
+        run: sam build
+
+      - name: SAM deploy
+        env:
+          SNS_TOPIC_ARN: ${{ secrets.SNS_TOPIC_ARN }}
+          COGNITO_CLIENT_SECRET: ${{ secrets.COGNITO_CLIENT_SECRET }}
+        run: |
+          sam deploy --no-confirm-changeset \
+            --parameter-overrides \
+              "DynamoTableName=\"${{ vars.DYNAMO_TABLE_NAME }}\" \
+               S3BucketName=\"${{ vars.S3_BUCKET_NAME }}\" \
+               SnsTopicArn=\"$SNS_TOPIC_ARN\" \
+               CognitoUserPoolId=\"${{ vars.COGNITO_USER_POOL_ID }}\" \
+               CognitoAppClientId=\"${{ vars.COGNITO_APP_CLIENT_ID }}\" \
+               CognitoAppClientSecret=\"$COGNITO_CLIENT_SECRET\""

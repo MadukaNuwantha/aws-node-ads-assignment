@@ -5,3 +5,4 @@ dist/
 coverage/
 *.js
 !jest.config.js
+.env.local
