@@ -33,11 +33,6 @@ const sampleAd: Ad = {
 describe('dynamoService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.TABLE_NAME = 'AdsTable';
-  });
-
-  afterEach(() => {
-    delete process.env.TABLE_NAME;
   });
 
   it('should save an ad to DynamoDB successfully', async () => {
@@ -53,13 +48,6 @@ describe('dynamoService', () => {
 
     await expect(saveAd(adWithImage)).resolves.toBeUndefined();
     expect(mockDocSend).toHaveBeenCalledTimes(1);
-  });
-
-  it('should throw when TABLE_NAME is not set', async () => {
-    delete process.env.TABLE_NAME;
-
-    await expect(saveAd(sampleAd)).rejects.toThrow('TABLE_NAME environment variable is not set');
-    expect(mockDocSend).not.toHaveBeenCalled();
   });
 
   it('should propagate DynamoDB errors', async () => {
@@ -88,13 +76,6 @@ describe('dynamoService', () => {
       const result = await getAllAds();
 
       expect(result).toEqual([]);
-    });
-
-    it('should throw when TABLE_NAME is not set', async () => {
-      delete process.env.TABLE_NAME;
-
-      await expect(getAllAds()).rejects.toThrow('TABLE_NAME environment variable is not set');
-      expect(mockDocSend).not.toHaveBeenCalled();
     });
 
     it('should propagate DynamoDB scan errors', async () => {

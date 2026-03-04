@@ -5,21 +5,17 @@ import { Ad } from '../types';
 const client = new DynamoDBClient({ region: process.env.REGION ?? 'ap-southeast-1' });
 const docClient = DynamoDBDocumentClient.from(client);
 
-export async function getAllAds(): Promise<Ad[]> {
-  const tableName = process.env.TABLE_NAME;
-  if (!tableName) throw new Error('TABLE_NAME environment variable is not set');
+const TABLE_NAME = 'AdsTable';
 
-  const result = await docClient.send(new ScanCommand({ TableName: tableName }));
+export async function getAllAds(): Promise<Ad[]> {
+  const result = await docClient.send(new ScanCommand({ TableName: TABLE_NAME }));
   return (result.Items ?? []) as Ad[];
 }
 
 export async function saveAd(ad: Ad): Promise<void> {
-  const tableName = process.env.TABLE_NAME;
-  if (!tableName) throw new Error('TABLE_NAME environment variable is not set');
-
   await docClient.send(
     new PutCommand({
-      TableName: tableName,
+      TableName: TABLE_NAME,
       Item: ad,
     })
   );

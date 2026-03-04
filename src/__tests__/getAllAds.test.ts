@@ -34,7 +34,6 @@ function makeEvent(overrides: Partial<APIGatewayProxyEventV2> = {}): APIGatewayP
 describe('getAllAds handler', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.TABLE_NAME = 'AdsTable';
   });
 
   it('should return 200 with an array of ads', async () => {

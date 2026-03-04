@@ -45,7 +45,6 @@ describe('createAd handler', () => {
     mockSaveAd.mockResolvedValue(undefined);
     mockPublishAdCreated.mockResolvedValue(undefined);
     mockUploadImage.mockResolvedValue('https://bucket.s3.amazonaws.com/ads/test.jpg');
-    process.env.TABLE_NAME = 'AdsTable';
     process.env.BUCKET_NAME = 'ads-api-assignment-s3-bucket';
     process.env.SNS_TOPIC_ARN = 'arn:aws:sns:ap-southeast-1:123:ads-api-ad-created';
   });
