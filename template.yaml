@@ -40,7 +40,7 @@ Globals:
     MemorySize: 256
     Environment:
       Variables:
-BUCKET_NAME: !Ref S3BucketName
+        BUCKET_NAME: !Ref S3BucketName
         SNS_TOPIC_ARN: !Ref SnsTopicArn
         REGION: !Ref AWS::Region
         COGNITO_APP_CLIENT_ID: !Ref CognitoAppClientId
